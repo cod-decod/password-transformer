@@ -5,10 +5,10 @@ import threading
 import os
 from datetime import datetime
 
-from core.file_handler import FileHandler
-from core.analyzer import PasswordAnalyzer
-from core.transformer import PasswordTransformer
-from utils.config import Config
+from src.core.file_handler import FileHandler
+from src.core.analyzer import PasswordAnalyzer
+from src.core.transformer import PasswordTransformer
+from src.utils.config import Config
 
 class PasswordTransformerApp:
     def __init__(self):
