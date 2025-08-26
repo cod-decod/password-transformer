@@ -1,0 +1,42 @@
+{
+    "_metadata": {
+        "version": "1.0",
+        "created": "2025-08-26T13:13:55.032989",
+        "description": "Password Transformer Configuration"
+    },
+    "appearance": {
+        "theme": "dark",
+        "color_theme": "blue",
+        "font_size": 12
+    },
+    "transformation": {
+        "default_intensity": "moderate",
+        "character_substitution": true,
+        "add_year": true,
+        "intelligent_patterns": true,
+        "preserve_strong": true,
+        "increment_numbers": true
+    },
+    "file_handling": {
+        "auto_backup": true,
+        "default_output_format": "txt",
+        "max_preview_items": 100,
+        "supported_encodings": [
+            "utf-8",
+            "utf-16",
+            "latin-1"
+        ]
+    },
+    "advanced": {
+        "max_file_size_mb": 50,
+        "processing_threads": 4,
+        "enable_logging": true,
+        "log_level": "INFO"
+    },
+    "ui": {
+        "window_width": 1200,
+        "window_height": 800,
+        "remember_window_size": true,
+        "show_tooltips": true
+    }
+}
