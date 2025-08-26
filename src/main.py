@@ -5,8 +5,13 @@ Author: cod-decod
 """
 
 import tkinter as tk
-from gui.main_window import PasswordTransformerApp
 import sys
+import os
+
+# Add the parent directory to sys.path so we can import src modules
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from src.gui.main_window import PasswordTransformerApp
 
 def main():
     """Main application entry point"""
