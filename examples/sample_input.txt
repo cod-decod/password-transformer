@@ -1,0 +1,18 @@
+# Sample password file for Password Transformer
+# Format: email:password (one per line)
+
+john.doe@email.com:password123
+jane.smith@gmail.com:qwerty
+admin@company.com:admin
+user@test.org:123456
+secure.user@domain.net:MyP@ssw0rd!
+test@example.com:letmein
+developer@code.io:HelloWorld2023
+manager@business.com:Welcome1
+guest@temp.mail:guest123
+power.user@advanced.net:Str0ng!P@ss2022
+simple@basic.com:abc123
+webmaster@site.org:webmaster
+support@help.com:support123
+demo@trial.net:demo2023
+sample@data.io:sample_password
