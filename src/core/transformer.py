@@ -2,18 +2,49 @@ import random
 import re
 from datetime import datetime
 from .strategies import TransformationStrategies
+from ..ml.recommendation_engine import RecommendationEngine
 
 class PasswordTransformer:
-    """Intelligent password transformation engine"""
+    """Intelligent password transformation engine with ML capabilities"""
     
-    def __init__(self):
+    def __init__(self, enable_ml=True):
         self.strategies = TransformationStrategies()
         self.current_year = datetime.now().year
+        self.enable_ml = enable_ml
         
-    def transform_password(self, password, analysis, settings):
-        """Transform password based on analysis and settings"""
+        # Initialize ML recommendation engine
+        if self.enable_ml:
+            try:
+                self.ml_engine = RecommendationEngine()
+            except Exception as e:
+                print(f"Warning: ML engine initialization failed: {e}")
+                self.enable_ml = False
+                self.ml_engine = None
+        else:
+            self.ml_engine = None
+        
+    def transform_password(self, password, analysis, settings, email=None, context=None):
+        """Transform password based on analysis and settings with ML enhancement"""
         if not password:
             return password
+            
+        # Get ML recommendations if enabled
+        if self.enable_ml and self.ml_engine:
+            try:
+                ml_recommendations = self.ml_engine.get_smart_recommendations(
+                    password, analysis, email, context
+                )
+                
+                # Use ML-recommended settings if confidence is high
+                if ml_recommendations['confidence'] > 0.7:
+                    # Merge ML recommendations with user settings
+                    enhanced_settings = settings.copy()
+                    enhanced_settings.update(ml_recommendations['settings'])
+                    enhanced_settings['intensity'] = ml_recommendations['intensity']
+                    settings = enhanced_settings
+                    
+            except Exception as e:
+                print(f"Warning: ML recommendation failed: {e}")
             
         # Determine transformation strategy based on strength level
         strength_level = analysis['strength_level']
@@ -201,3 +232,53 @@ class PasswordTransformer:
                 changes.append(f"Added {new_special - orig_special} special characters")
                 
         return changes if changes else ["No changes applied"]
+        
+    def learn_from_transformation(self, original, transformed, original_analysis, 
+                                transformed_analysis, settings, user_rating=None, 
+                                accepted=True, email=None):
+        """Learn from transformation results to improve future recommendations"""
+        if self.enable_ml and self.ml_engine:
+            try:
+                # Calculate success score based on improvement and user feedback
+                strength_improvement = (transformed_analysis.get('strength_score', 0) - 
+                                      original_analysis.get('strength_score', 0))
+                
+                # Base success score on strength improvement
+                success_score = 0.5 + min(0.4, strength_improvement / 50.0)
+                
+                # Adjust based on user feedback if available
+                if user_rating is not None:
+                    success_score = 0.3 * success_score + 0.7 * (user_rating / 10.0)
+                    
+                if not accepted:
+                    success_score *= 0.5  # Heavily penalize rejected transformations
+                    
+                # Learn from this transformation
+                self.ml_engine.learn_from_user_feedback(
+                    original, original_analysis, settings, transformed, 
+                    transformed_analysis, user_rating or int(success_score * 10), 
+                    accepted, email
+                )
+                
+            except Exception as e:
+                print(f"Warning: ML learning failed: {e}")
+                
+    def get_ml_insights(self):
+        """Get ML insights and learning data"""
+        if self.enable_ml and self.ml_engine:
+            try:
+                return self.ml_engine.get_learning_dashboard_data()
+            except Exception as e:
+                print(f"Warning: Failed to get ML insights: {e}")
+                return None
+        return None
+        
+    def get_smart_recommendations(self, password, analysis, email=None, context=None):
+        """Get ML-powered smart recommendations"""
+        if self.enable_ml and self.ml_engine:
+            try:
+                return self.ml_engine.get_smart_recommendations(password, analysis, email, context)
+            except Exception as e:
+                print(f"Warning: Failed to get smart recommendations: {e}")
+                return None
+        return None

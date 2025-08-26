@@ -9,6 +9,7 @@ from core.file_handler import FileHandler
 from core.analyzer import PasswordAnalyzer
 from core.transformer import PasswordTransformer
 from utils.config import Config
+from ml.analytics import Analytics
 
 class PasswordTransformerApp:
     def __init__(self):
@@ -21,7 +22,22 @@ class PasswordTransformerApp:
         self.config = Config()
         self.file_handler = FileHandler()
         self.analyzer = PasswordAnalyzer()
-        self.transformer = PasswordTransformer()
+        
+        # Initialize transformer with ML (with error handling)
+        try:
+            self.transformer = PasswordTransformer(enable_ml=True)
+            self.ml_available = True
+        except Exception as e:
+            print(f"Warning: ML initialization failed, using basic mode: {e}")
+            self.transformer = PasswordTransformer(enable_ml=False)
+            self.ml_available = False
+            
+        # Initialize analytics (with error handling)
+        try:
+            self.analytics = Analytics()
+        except Exception as e:
+            print(f"Warning: Analytics initialization failed: {e}")
+            self.analytics = None
         
         # Initialize GUI
         self.setup_main_window()
@@ -31,6 +47,10 @@ class PasswordTransformerApp:
         self.input_data = []
         self.output_data = []
         self.input_file_path = ""
+        
+        # ML and Smart Mode
+        self.smart_mode_enabled = tk.BooleanVar(value=False)
+        self.ml_insights_cache = None
         
     def setup_main_window(self):
         """Setup the main application window"""
@@ -48,7 +68,7 @@ class PasswordTransformerApp:
         # Main container
         self.main_frame = ctk.CTkFrame(self.root)
         self.main_frame.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
-        self.main_frame.grid_rowconfigure(3, weight=1)
+        self.main_frame.grid_rowconfigure(2, weight=1)
         self.main_frame.grid_columnconfigure(0, weight=1)
         
         # Title
@@ -62,22 +82,47 @@ class PasswordTransformerApp:
         # Subtitle
         self.subtitle_label = ctk.CTkLabel(
             self.main_frame, 
-            text="Intelligent Password Analysis & Transformation",
+            text="Intelligent Password Analysis & Transformation with ML",
             font=ctk.CTkFont(size=14)
         )
         self.subtitle_label.grid(row=1, column=0, pady=(0, 20))
         
-        # Create sections
-        self.create_file_section()
-        self.create_settings_section()
-        self.create_preview_section()
-        self.create_progress_section()
-        self.create_action_buttons()
+        # Create tabbed interface
+        self.tabview = ctk.CTkTabview(self.main_frame, width=1150, height=600)
+        self.tabview.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
         
-    def create_file_section(self):
+        # Add tabs
+        self.transformer_tab = self.tabview.add("🔧 Transformer")
+        self.analytics_tab = self.tabview.add("📊 Analytics")
+        self.smart_mode_tab = self.tabview.add("🧠 Smart Mode")
+        
+        # Configure tabs
+        self.transformer_tab.grid_rowconfigure(2, weight=1)
+        self.transformer_tab.grid_columnconfigure(0, weight=1)
+        
+        self.analytics_tab.grid_rowconfigure(1, weight=1)
+        self.analytics_tab.grid_columnconfigure(0, weight=1)
+        
+        self.smart_mode_tab.grid_rowconfigure(1, weight=1)
+        self.smart_mode_tab.grid_columnconfigure(0, weight=1)
+        
+        # Create sections in transformer tab
+        self.create_transformer_tab_content()
+        self.create_analytics_tab_content()
+        self.create_smart_mode_tab_content()
+        
+    def create_transformer_tab_content(self):
+        """Create content for the transformer tab"""
+        self.create_file_section(self.transformer_tab)
+        self.create_settings_section(self.transformer_tab)
+        self.create_preview_section(self.transformer_tab)
+        self.create_progress_section(self.transformer_tab)
+        self.create_action_buttons(self.transformer_tab)
+        
+    def create_file_section(self, parent):
         """Create file operations section"""
-        file_frame = ctk.CTkFrame(self.main_frame)
-        file_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
+        file_frame = ctk.CTkFrame(parent)
+        file_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         file_frame.grid_columnconfigure(1, weight=1)
         
         # Section title
@@ -115,10 +160,10 @@ class PasswordTransformerApp:
         )
         self.file_info_label.grid(row=2, column=0, columnspan=3, padx=15, pady=(5, 15))
         
-    def create_settings_section(self):
+    def create_settings_section(self, parent):
         """Create transformation settings section"""
-        settings_frame = ctk.CTkFrame(self.main_frame)
-        settings_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=5)
+        settings_frame = ctk.CTkFrame(parent)
+        settings_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
         
         # Settings title
         ctk.CTkLabel(
@@ -195,10 +240,10 @@ class PasswordTransformerApp:
         )
         self.increment_check.grid(row=3, column=0, sticky="w", pady=5)
         
-    def create_preview_section(self):
+    def create_preview_section(self, parent):
         """Create results preview section"""
-        preview_frame = ctk.CTkFrame(self.main_frame)
-        preview_frame.grid(row=4, column=0, sticky="nsew", padx=10, pady=10)
+        preview_frame = ctk.CTkFrame(parent)
+        preview_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
         preview_frame.grid_rowconfigure(1, weight=1)
         preview_frame.grid_columnconfigure(0, weight=1)
         
@@ -241,10 +286,10 @@ class PasswordTransformerApp:
         scrollbar_y.grid(row=1, column=1, sticky="ns", pady=(0, 15))
         scrollbar_x.grid(row=2, column=0, sticky="ew", padx=15)
         
-    def create_progress_section(self):
+    def create_progress_section(self, parent):
         """Create progress tracking section"""
-        progress_frame = ctk.CTkFrame(self.main_frame)
-        progress_frame.grid(row=5, column=0, sticky="ew", padx=10, pady=5)
+        progress_frame = ctk.CTkFrame(parent)
+        progress_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=5)
         progress_frame.grid_columnconfigure(1, weight=1)
         
         # Progress elements
@@ -264,10 +309,10 @@ class PasswordTransformerApp:
         self.progress_bar.grid(row=0, column=1, padx=(10, 15), pady=15, sticky="ew")
         self.progress_bar.set(0)
         
-    def create_action_buttons(self):
+    def create_action_buttons(self, parent):
         """Create action buttons section"""
-        button_frame = ctk.CTkFrame(self.main_frame)
-        button_frame.grid(row=6, column=0, sticky="ew", padx=10, pady=(5, 20))
+        button_frame = ctk.CTkFrame(parent)
+        button_frame.grid(row=4, column=0, sticky="ew", padx=10, pady=(5, 20))
         button_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
         
         # Main action buttons
@@ -349,35 +394,60 @@ class PasswordTransformerApp:
         threading.Thread(target=self._generate_preview, daemon=True).start()
         
     def _generate_preview(self):
-        """Generate preview data in separate thread"""
+        """Generate preview data in separate thread with ML enhancement"""
         try:
             preview_data = []
             total = min(len(self.input_data), 100)  # Limit preview to 100 items
+            settings = self._get_current_settings()
             
             for i in range(total):
                 email, password = self.input_data[i]
                 
-                # Analyze current password
-                analysis = self.analyzer.analyze_password(password)
-                
-                # Generate transformation
-                settings = self._get_current_settings()
-                new_password = self.transformer.transform_password(password, analysis, settings)
-                
-                # Analyze new password
-                new_analysis = self.analyzer.analyze_password(new_password)
-                
-                # Calculate strength change
-                strength_change = new_analysis['strength_score'] - analysis['strength_score']
-                
-                preview_data.append({
-                    'email': email,
-                    'original': password,
-                    'modified': new_password,
-                    'original_strength': analysis['strength_score'],
-                    'new_strength': new_analysis['strength_score'],
-                    'change': strength_change
-                })
+                try:
+                    # Analyze current password
+                    analysis = self.analyzer.analyze_password(password)
+                    
+                    # Generate transformation with ML if available
+                    if self.ml_available:
+                        new_password = self.transformer.transform_password(
+                            password, analysis, settings, email
+                        )
+                    else:
+                        new_password = self.transformer.transform_password(password, analysis, settings)
+                    
+                    # Analyze new password
+                    new_analysis = self.analyzer.analyze_password(new_password)
+                    
+                    # Calculate strength change
+                    strength_change = new_analysis['strength_score'] - analysis['strength_score']
+                    
+                    # Get transformation summary
+                    changes = self.transformer.get_transformation_summary(password, new_password, analysis)
+                    
+                    preview_data.append({
+                        'email': email,
+                        'original': password,
+                        'modified': new_password,
+                        'original_strength': analysis['strength_score'],
+                        'new_strength': new_analysis['strength_score'],
+                        'change': strength_change,
+                        'pattern_type': analysis.get('pattern_type', 'unknown'),
+                        'changes_applied': ', '.join(changes[:2])  # Show first 2 changes
+                    })
+                    
+                except Exception as e:
+                    print(f"Preview generation failed for {email}: {e}")
+                    # Add error entry
+                    preview_data.append({
+                        'email': email,
+                        'original': password,
+                        'modified': '❌ Error',
+                        'original_strength': 0,
+                        'new_strength': 0,
+                        'change': 0,
+                        'pattern_type': 'error',
+                        'changes_applied': 'Failed to process'
+                    })
                 
                 # Update progress
                 progress = (i + 1) / total
@@ -449,51 +519,95 @@ class PasswordTransformerApp:
         ).start()
         
     def _process_passwords_thread(self, output_path):
-        """Process passwords in separate thread"""
+        """Process passwords in separate thread with enhanced error handling"""
         try:
             processed_data = []
             total = len(self.input_data)
             settings = self._get_current_settings()
+            failed_transformations = 0
             
             for i, (email, password) in enumerate(self.input_data):
-                # Analyze password
-                analysis = self.analyzer.analyze_password(password)
-                
-                # Transform password
-                new_password = self.transformer.transform_password(password, analysis, settings)
-                processed_data.append((email, new_password))
-                
+                try:
+                    # Analyze password
+                    analysis = self.analyzer.analyze_password(password)
+                    
+                    # Transform password with ML enhancement if available
+                    if self.ml_available:
+                        # Include email context for ML recommendations
+                        new_password = self.transformer.transform_password(
+                            password, analysis, settings, email
+                        )
+                        
+                        # Learn from transformation if successful
+                        new_analysis = self.analyzer.analyze_password(new_password)
+                        if new_analysis['strength_score'] > analysis['strength_score']:
+                            # Positive improvement - learn from it
+                            self.transformer.learn_from_transformation(
+                                password, new_password, analysis, new_analysis, 
+                                settings, None, True, email
+                            )
+                    else:
+                        # Basic transformation without ML
+                        new_password = self.transformer.transform_password(password, analysis, settings)
+                        
+                    processed_data.append((email, new_password))
+                    
+                except Exception as e:
+                    print(f"Warning: Failed to process {email}: {e}")
+                    # Keep original password on error
+                    processed_data.append((email, password))
+                    failed_transformations += 1
+                    
                 # Update progress
                 progress = (i + 1) / total
                 self.root.after(0, lambda p=progress: self.progress_bar.set(p))
                 
-            # Save results
-            if output_path.endswith('.csv'):
-                self.file_handler.save_csv(output_path, processed_data)
-            else:
-                self.file_handler.save_file(output_path, processed_data)
+            # Save results with error handling
+            try:
+                if output_path.endswith('.csv'):
+                    self.file_handler.save_csv(output_path, processed_data)
+                else:
+                    self.file_handler.save_file(output_path, processed_data)
+                    
+                self.output_data = processed_data
                 
-            self.output_data = processed_data
-            
-            # Update UI
-            self.root.after(0, lambda: self._processing_complete(len(processed_data), output_path))
-            
+                # Create completion message
+                success_count = len(processed_data) - failed_transformations
+                completion_msg = f"Successfully processed {success_count}/{len(processed_data)} passwords"
+                if failed_transformations > 0:
+                    completion_msg += f" ({failed_transformations} failed)"
+                
+                # Update UI
+                self.root.after(0, lambda: self._processing_complete(
+                    success_count, output_path, failed_transformations
+                ))
+                
+            except Exception as save_error:
+                self.root.after(0, lambda: self._processing_error(f"Save failed: {save_error}"))
+                
         except Exception as e:
             self.root.after(0, lambda: self._processing_error(str(e)))
             
-    def _processing_complete(self, count, output_path):
-        """Handle successful processing completion"""
-        self.progress_label.configure(
-            text=f"✅ Successfully processed {count} passwords → {os.path.basename(output_path)}"
-        )
+    def _processing_complete(self, count, output_path, failed_count=0):
+        """Handle successful processing completion with enhanced reporting"""
+        status_text = f"✅ Successfully processed {count} passwords → {os.path.basename(output_path)}"
+        if failed_count > 0:
+            status_text += f" (⚠️ {failed_count} failed)"
+            
+        self.progress_label.configure(text=status_text)
         self.process_button.configure(state="normal")
         self.export_button.configure(state="normal")
-        messagebox.showinfo(
-            "Success", 
-            f"🎉 Passwords processed successfully!\n\n"
-            f"📊 {count} passwords transformed\n"
-            f"💾 Saved to: {os.path.basename(output_path)}"
-        )
+        
+        # Show detailed message
+        message = f"🎉 Password processing completed!\\n\\n📊 {count} passwords transformed"
+        if failed_count > 0:
+            message += f"\\n⚠️ {failed_count} passwords failed to transform"
+        message += f"\\n💾 Saved to: {os.path.basename(output_path)}"
+        
+        if self.ml_available:
+            message += "\\n\\n🧠 ML system learned from successful transformations"
+            
+        messagebox.showinfo("Success", message)
         
     def _processing_error(self, error_msg):
         """Handle processing errors"""
@@ -544,6 +658,328 @@ class PasswordTransformerApp:
             'preserve_strong': self.preserve_var.get(),
             'increment_numbers': self.increment_var.get()
         }
+        
+    def create_analytics_tab_content(self):
+        """Create content for the analytics tab"""
+        # Analytics header
+        header_frame = ctk.CTkFrame(self.analytics_tab)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        header_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(
+            header_frame,
+            text="📊 ML Analytics Dashboard",
+            font=ctk.CTkFont(size=18, weight="bold")
+        ).grid(row=0, column=0, padx=15, pady=15, sticky="w")
+        
+        # Refresh button
+        self.refresh_analytics_button = ctk.CTkButton(
+            header_frame,
+            text="🔄 Refresh Data",
+            command=self.refresh_analytics,
+            width=120
+        )
+        self.refresh_analytics_button.grid(row=0, column=1, padx=15, pady=15, sticky="e")
+        
+        # Main analytics content
+        self.analytics_content_frame = ctk.CTkScrollableFrame(self.analytics_tab)
+        self.analytics_content_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        self.analytics_content_frame.grid_columnconfigure(0, weight=1)
+        
+        # Initialize analytics display
+        self.refresh_analytics()
+        
+    def create_smart_mode_tab_content(self):
+        """Create content for the smart mode tab"""
+        # Smart Mode header
+        header_frame = ctk.CTkFrame(self.smart_mode_tab)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        
+        ctk.CTkLabel(
+            header_frame,
+            text="🧠 Smart Mode - ML-Powered Recommendations",
+            font=ctk.CTkFont(size=18, weight="bold")
+        ).grid(row=0, column=0, padx=15, pady=15)
+        
+        # Smart Mode toggle
+        self.smart_mode_switch = ctk.CTkSwitch(
+            header_frame,
+            text="Enable Smart Mode",
+            variable=self.smart_mode_enabled,
+            command=self.toggle_smart_mode
+        )
+        self.smart_mode_switch.grid(row=1, column=0, padx=15, pady=10)
+        
+        # Smart mode content
+        self.smart_content_frame = ctk.CTkScrollableFrame(self.smart_mode_tab)
+        self.smart_content_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        self.smart_content_frame.grid_columnconfigure(0, weight=1)
+        
+        # Initialize smart mode display
+        self.update_smart_mode_display()
+        
+    def refresh_analytics(self):
+        """Refresh analytics data and display"""
+        try:
+            # Clear existing content
+            for widget in self.analytics_content_frame.winfo_children():
+                widget.destroy()
+                
+            # Get analytics data
+            insights = self.transformer.get_ml_insights()
+            dashboard_data = self.analytics.get_dashboard_summary()
+            
+            if not insights:
+                ctk.CTkLabel(
+                    self.analytics_content_frame,
+                    text="🔍 No learning data available yet.\nStart transforming passwords to see analytics!",
+                    font=ctk.CTkFont(size=14)
+                ).grid(row=0, column=0, pady=50)
+                return
+                
+            # Overview section
+            self.create_overview_section(dashboard_data)
+            
+            # Learning insights section  
+            self.create_learning_insights_section(insights)
+            
+            # Pattern effectiveness section
+            self.create_pattern_effectiveness_section(insights)
+            
+        except Exception as e:
+            ctk.CTkLabel(
+                self.analytics_content_frame,
+                text=f"Error loading analytics: {str(e)}",
+                text_color="red"
+            ).grid(row=0, column=0, pady=20)
+            
+    def create_overview_section(self, data):
+        """Create overview section in analytics"""
+        overview_frame = ctk.CTkFrame(self.analytics_content_frame)
+        overview_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        overview_frame.grid_columnconfigure((0, 1, 2), weight=1)
+        
+        ctk.CTkLabel(
+            overview_frame,
+            text="📋 Overview",
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).grid(row=0, column=0, columnspan=3, pady=10)
+        
+        # Stats cards
+        overview = data.get('overview', {})
+        
+        # Total transformations
+        total_frame = ctk.CTkFrame(overview_frame)
+        total_frame.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+        ctk.CTkLabel(total_frame, text="Total Transformations", font=ctk.CTkFont(weight="bold")).pack(pady=5)
+        ctk.CTkLabel(total_frame, text=str(overview.get('total_transformations', 0)), 
+                    font=ctk.CTkFont(size=20)).pack()
+        
+        # Success rate
+        success_frame = ctk.CTkFrame(overview_frame)
+        success_frame.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
+        ctk.CTkLabel(success_frame, text="Success Rate", font=ctk.CTkFont(weight="bold")).pack(pady=5)
+        ctk.CTkLabel(success_frame, text=f"{overview.get('success_rate', 0):.1%}", 
+                    font=ctk.CTkFont(size=20)).pack()
+        
+        # Avg improvement
+        improvement_frame = ctk.CTkFrame(overview_frame)
+        improvement_frame.grid(row=1, column=2, padx=10, pady=10, sticky="ew")
+        ctk.CTkLabel(improvement_frame, text="Avg Improvement", font=ctk.CTkFont(weight="bold")).pack(pady=5)
+        ctk.CTkLabel(improvement_frame, text=f"{overview.get('avg_improvement', 0):.1f}", 
+                    font=ctk.CTkFont(size=20)).pack()
+                    
+    def create_learning_insights_section(self, insights):
+        """Create learning insights section"""
+        learning_frame = ctk.CTkFrame(self.analytics_content_frame)
+        learning_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+        
+        ctk.CTkLabel(
+            learning_frame,
+            text="🧠 Learning Status",
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).grid(row=0, column=0, pady=10, padx=15, sticky="w")
+        
+        # Learning details
+        details_text = f"""
+        • Patterns learned: {insights.get('patterns_learned', 0)}
+        • Model trained: {'Yes' if insights.get('cluster_model_trained', False) else 'No'}
+        • Average strength improvement: {insights.get('average_strength_improvement', 0):.1f}
+        • Learning quality: {insights.get('average_success_rate', 0):.1%} success rate
+        """
+        
+        ctk.CTkLabel(
+            learning_frame,
+            text=details_text,
+            justify="left",
+            font=ctk.CTkFont(size=12)
+        ).grid(row=1, column=0, pady=10, padx=15, sticky="w")
+        
+    def create_pattern_effectiveness_section(self, insights):
+        """Create pattern effectiveness section"""
+        pattern_frame = ctk.CTkFrame(self.analytics_content_frame)
+        pattern_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        
+        ctk.CTkLabel(
+            pattern_frame,
+            text="🎯 Pattern Effectiveness",
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).grid(row=0, column=0, pady=10, padx=15, sticky="w")
+        
+        # Pattern success rates
+        success_rates = insights.get('success_rates_by_pattern', {})
+        if success_rates:
+            for i, (pattern, rate) in enumerate(success_rates.items()):
+                if not pattern.endswith('_light') and not pattern.endswith('_moderate') and not pattern.endswith('_aggressive'):
+                    pattern_label = ctk.CTkLabel(
+                        pattern_frame,
+                        text=f"{pattern.replace('_', ' ').title()}: {rate:.1%}",
+                        font=ctk.CTkFont(size=12)
+                    )
+                    pattern_label.grid(row=i+1, column=0, pady=2, padx=15, sticky="w")
+        else:
+            ctk.CTkLabel(
+                pattern_frame,
+                text="No pattern data available yet",
+                font=ctk.CTkFont(size=12)
+            ).grid(row=1, column=0, pady=10, padx=15, sticky="w")
+            
+    def update_smart_mode_display(self):
+        """Update smart mode display"""
+        try:
+            # Clear existing content
+            for widget in self.smart_content_frame.winfo_children():
+                widget.destroy()
+                
+            if not self.smart_mode_enabled.get():
+                ctk.CTkLabel(
+                    self.smart_content_frame,
+                    text="🔧 Enable Smart Mode to get AI-powered recommendations\n\nSmart Mode uses machine learning to:\n• Analyze your password patterns\n• Provide personalized recommendations\n• Learn from your preferences\n• Optimize transformation strategies",
+                    font=ctk.CTkFont(size=14),
+                    justify="left"
+                ).grid(row=0, column=0, pady=50)
+                return
+                
+            # Smart mode is enabled - show recommendations interface
+            ctk.CTkLabel(
+                self.smart_content_frame,
+                text="🧠 Smart Mode Active",
+                font=ctk.CTkFont(size=16, weight="bold")
+            ).grid(row=0, column=0, pady=10)
+            
+            # Test password input for recommendations
+            test_frame = ctk.CTkFrame(self.smart_content_frame)
+            test_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
+            test_frame.grid_columnconfigure(1, weight=1)
+            
+            ctk.CTkLabel(test_frame, text="Test Password:").grid(row=0, column=0, padx=10, pady=10, sticky="w")
+            
+            self.test_password_entry = ctk.CTkEntry(
+                test_frame,
+                placeholder_text="Enter a password to get AI recommendations...",
+                height=35
+            )
+            self.test_password_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+            
+            self.get_recommendations_button = ctk.CTkButton(
+                test_frame,
+                text="🔍 Analyze",
+                command=self.get_smart_recommendations,
+                width=100
+            )
+            self.get_recommendations_button.grid(row=0, column=2, padx=10, pady=10)
+            
+            # Recommendations display area
+            self.recommendations_frame = ctk.CTkFrame(self.smart_content_frame)
+            self.recommendations_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
+            
+        except Exception as e:
+            ctk.CTkLabel(
+                self.smart_content_frame,
+                text=f"Error in smart mode: {str(e)}",
+                text_color="red"
+            ).grid(row=0, column=0, pady=20)
+            
+    def toggle_smart_mode(self):
+        """Toggle smart mode on/off"""
+        self.update_smart_mode_display()
+        
+    def get_smart_recommendations(self):
+        """Get and display smart recommendations for test password"""
+        try:
+            test_password = self.test_password_entry.get()
+            if not test_password:
+                return
+                
+            # Clear previous recommendations
+            for widget in self.recommendations_frame.winfo_children():
+                widget.destroy()
+                
+            # Analyze password
+            analysis = self.analyzer.analyze_password(test_password)
+            
+            # Get smart recommendations
+            recommendations = self.transformer.get_smart_recommendations(
+                test_password, analysis, "user@example.com"
+            )
+            
+            if not recommendations:
+                ctk.CTkLabel(
+                    self.recommendations_frame,
+                    text="No recommendations available",
+                    text_color="orange"
+                ).pack(pady=10)
+                return
+                
+            # Display analysis
+            analysis_text = f"""
+            Password Analysis:
+            • Strength: {analysis['strength_level'].replace('_', ' ').title()}
+            • Pattern: {analysis['pattern_type'].replace('_', ' ').title()}
+            • Score: {analysis['strength_score']}/100
+            """
+            
+            ctk.CTkLabel(
+                self.recommendations_frame,
+                text=analysis_text,
+                justify="left",
+                font=ctk.CTkFont(size=11)
+            ).pack(pady=5, padx=10, anchor="w")
+            
+            # Display recommendations
+            rec_text = f"""
+            AI Recommendations:
+            • Recommended intensity: {recommendations['intensity'].title()}
+            • Confidence: {recommendations['confidence']:.1%}
+            • Predicted improvement: +{recommendations['effectiveness_prediction']['predicted_improvement']:.1f} points
+            • Success probability: {recommendations['effectiveness_prediction']['success_probability']:.1%}
+            """
+            
+            ctk.CTkLabel(
+                self.recommendations_frame,
+                text=rec_text,
+                justify="left",
+                font=ctk.CTkFont(size=11),
+                text_color="lightgreen"
+            ).pack(pady=5, padx=10, anchor="w")
+            
+            # Display reasoning
+            reasoning = "\\n".join([f"• {reason}" for reason in recommendations.get('reasoning', [])])
+            if reasoning:
+                ctk.CTkLabel(
+                    self.recommendations_frame,
+                    text=f"Reasoning:\\n{reasoning}",
+                    justify="left",
+                    font=ctk.CTkFont(size=10),
+                    text_color="lightblue"
+                ).pack(pady=5, padx=10, anchor="w")
+                
+        except Exception as e:
+            ctk.CTkLabel(
+                self.recommendations_frame,
+                text=f"Error getting recommendations: {str(e)}",
+                text_color="red"
+            ).pack(pady=10)
         
     def run(self):
         """Start the application"""
